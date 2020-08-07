@@ -7,83 +7,118 @@
 //
 
 import SpriteKit
-import GameplayKit
 
-class GameScene: SKScene {
+class GameScene: SKScene, SKPhysicsContactDelegate {
+    var scoreLabel: SKLabelNode!
+    var timeLabel: SKLabelNode!
     
-    private var label : SKLabelNode?
-    private var spinnyNode : SKShapeNode?
+    var possibleEnemies = EnemyType.allCases 
+    var gameTimer: Timer?
+    var isGameOver = false
     
+    var timeRemaining = 60 {
+        didSet {
+            timeLabel.text = "Time Remaining \(timeRemaining)"
+        }
+    }
+
+    var score = 0 {
+        didSet {
+            scoreLabel.text = "Score: \(score)"
+        }
+    }
+
     override func didMove(to view: SKView) {
+        backgroundColor = .black
+
+        scoreLabel = SKLabelNode(fontNamed: "Chalkduster")
+        scoreLabel.position = CGPoint(x: 16, y: 16)
+        scoreLabel.horizontalAlignmentMode = .left
+        addChild(scoreLabel)
+
+        score = 0
         
-        // Get label node from scene and store it for use later
-        self.label = self.childNode(withName: "//helloLabel") as? SKLabelNode
-        if let label = self.label {
-            label.alpha = 0.0
-            label.run(SKAction.fadeIn(withDuration: 2.0))
-        }
+        timeLabel = SKLabelNode(fontNamed: "Chalkduster")
+        timeLabel.position = CGPoint(x: 16, y: 32)
+        timeLabel.horizontalAlignmentMode = .left
+        addChild(timeLabel)
+
+        physicsWorld.gravity = .zero
+        physicsWorld.contactDelegate = self
+
+        gameTimer = Timer.scheduledTimer(timeInterval: 0.50, target: self, selector: #selector(createEnemy), userInfo: nil, repeats: true)
+    }
+
+    @objc func createEnemy() {
+        guard let enemy = possibleEnemies.randomElement() else { return }
         
-        // Create shape node to use during mouse interaction
-        let w = (self.size.width + self.size.height) * 0.05
-        self.spinnyNode = SKShapeNode.init(rectOf: CGSize.init(width: w, height: w), cornerRadius: w * 0.3)
-        
-        if let spinnyNode = self.spinnyNode {
-            spinnyNode.lineWidth = 2.5
-            
-            spinnyNode.run(SKAction.repeatForever(SKAction.rotate(byAngle: CGFloat(Double.pi), duration: 1)))
-            spinnyNode.run(SKAction.sequence([SKAction.wait(forDuration: 0.5),
-                                              SKAction.fadeOut(withDuration: 0.5),
-                                              SKAction.removeFromParent()]))
-        }
-    }
-    
-    
-    func touchDown(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.green
-            self.addChild(n)
-        }
-    }
-    
-    func touchMoved(toPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.blue
-            self.addChild(n)
-        }
-    }
-    
-    func touchUp(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.red
-            self.addChild(n)
-        }
-    }
-    
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if let label = self.label {
-            label.run(SKAction.init(named: "Pulse")!, withKey: "fadeInOut")
+        let sprite:SKSpriteNode!
+        switch enemy {
+            case .small:
+                  sprite = SKSpriteNode(imageNamed: "targetSmall")
+                  sprite.name = "small"
+                  sprite.size = CGSize(width: 50, height: 50)
+            case .medium:
+                  sprite = SKSpriteNode(imageNamed: "targetMedium")
+                  sprite.size = CGSize(width: 100, height: 100)
+                  sprite.name = "medium"
+            case .large:
+                  sprite = SKSpriteNode(imageNamed: "targetLarge")
+                  sprite.size = CGSize(width: 150, height: 150)
+                  sprite.name = "large"
         }
         
-        for t in touches { self.touchDown(atPoint: t.location(in: self)) }
+        let x: Int!
+        let xVectorInt:Int!
+        
+        if Int.random(in:0...100) % 2 == 0 {
+            x = -200
+            xVectorInt = 200
+        }
+        else {
+            x = 1200
+            xVectorInt = -200
+        }
+        sprite.position = CGPoint(x: x, y: Int.random(in: 100...700))
+        addChild(sprite)
+        
+        sprite.physicsBody = SKPhysicsBody(circleOfRadius: sprite.size.width / 2)
+        sprite.physicsBody?.isDynamic = true
+        sprite.physicsBody?.velocity = CGVector(dx: xVectorInt, dy: Int.random(in: -50...50))
+        sprite.physicsBody?.angularVelocity = 5
+        sprite.physicsBody?.linearDamping = 0
+        sprite.physicsBody?.angularDamping = 0
     }
-    
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchMoved(toPoint: t.location(in: self)) }
-    }
-    
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
-    }
-    
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
-    }
-    
     
     override func update(_ currentTime: TimeInterval) {
-        // Called before each frame is rendered
+        for node in children {
+            if node.position.x < -300 || node.position.x > 1400 {
+                node.removeFromParent()
+            }
+        }
     }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first else { return }
+        let location = touch.location(in: self)
+        
+        let tappedNodes = nodes(at: location)
+        
+        for node in tappedNodes {
+            switch node.name {
+                case "small":
+                    score += EnemyType.small.rawValue
+                case "medium":
+                    score += EnemyType.medium.rawValue
+                case "large":
+                    score += EnemyType.large.rawValue
+                default:
+                    break
+            }
+            
+            node.removeFromParent()
+        }
+
+    }
+
 }
