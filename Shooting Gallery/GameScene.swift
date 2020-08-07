@@ -14,6 +14,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     
     var possibleEnemies = EnemyType.allCases 
     var gameTimer: Timer?
+    var timeRemainingTimer: Timer?
     var isGameOver = false
     
     var timeRemaining = 60 {
@@ -39,7 +40,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         score = 0
         
         timeLabel = SKLabelNode(fontNamed: "Chalkduster")
-        timeLabel.position = CGPoint(x: 16, y: 32)
+        timeLabel.position = CGPoint(x: 16, y: 58)
         timeLabel.horizontalAlignmentMode = .left
         addChild(timeLabel)
 
@@ -47,6 +48,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.contactDelegate = self
 
         gameTimer = Timer.scheduledTimer(timeInterval: 0.50, target: self, selector: #selector(createEnemy), userInfo: nil, repeats: true)
+        
+        timeRemainingTimer = Timer.scheduledTimer(timeInterval: 1, target: self, selector: #selector(updateTimer), userInfo: nil, repeats: true)
+        
     }
 
     @objc func createEnemy() {
@@ -95,6 +99,9 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             if node.position.x < -300 || node.position.x > 1400 {
                 node.removeFromParent()
             }
+            if node.position.y < 0 || node.position.y > 950 {
+                node.removeFromParent()
+            }
         }
     }
 
@@ -104,7 +111,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         
         let tappedNodes = nodes(at: location)
         
-        for node in tappedNodes {
+        nodeLoop: for node in tappedNodes {
             switch node.name {
                 case "small":
                     score += EnemyType.small.rawValue
@@ -113,12 +120,27 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
                 case "large":
                     score += EnemyType.large.rawValue
                 default:
-                    break
+                    break nodeLoop
             }
             
             node.removeFromParent()
         }
 
+    }
+    
+    @objc func updateTimer() {
+        timeRemaining -= 1
+        
+        if timeRemaining <= 0 {
+            isGameOver = true
+            timeRemainingTimer!.invalidate()
+            gameTimer?.invalidate()
+            let gameOverLabel = SKLabelNode(fontNamed: "Chalkduster")
+            gameOverLabel.position = CGPoint(x: 512, y: 384)
+            gameOverLabel.fontSize = CGFloat(64)
+            gameOverLabel.zPosition = 2
+            addChild(gameOverLabel)
+        }
     }
 
 }
